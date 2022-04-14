@@ -49,6 +49,20 @@ func (mr *MockLinkRepositoryMockRecorder) Create(ctx, link interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockLinkRepository)(nil).Create), ctx, link)
 }
 
+// Delete mocks base method.
+func (m *MockLinkRepository) Delete(ctx context.Context, hash string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, hash)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockLinkRepositoryMockRecorder) Delete(ctx, hash interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockLinkRepository)(nil).Delete), ctx, hash)
+}
+
 // FindByHash mocks base method.
 func (m *MockLinkRepository) FindByHash(ctx context.Context, hash string) (*domain.Link, error) {
 	m.ctrl.T.Helper()
@@ -62,4 +76,19 @@ func (m *MockLinkRepository) FindByHash(ctx context.Context, hash string) (*doma
 func (mr *MockLinkRepositoryMockRecorder) FindByHash(ctx, hash interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByHash", reflect.TypeOf((*MockLinkRepository)(nil).FindByHash), ctx, hash)
+}
+
+// Update mocks base method.
+func (m *MockLinkRepository) Update(ctx context.Context, hash, url string) (*domain.Link, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, hash, url)
+	ret0, _ := ret[0].(*domain.Link)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockLinkRepositoryMockRecorder) Update(ctx, hash, url interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockLinkRepository)(nil).Update), ctx, hash, url)
 }

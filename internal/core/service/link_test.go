@@ -124,3 +124,217 @@ func TestLinkService_FindUrlByHash_RepositoryErr(t *testing.T) {
 	assert.Empty(t, url)
 	assert.NotNil(t, err)
 }
+
+func TestLinkService_Delete(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCounter := mock.NewMockCounter(ctrl)
+	mockEncoder := mock.NewMockEncoder(ctrl)
+	mockRepository := mock.NewMockLinkRepository(ctrl)
+
+	hash := "15saSAE"
+	originalURL := "http://github.com/hugosrc/shortlink"
+	userId := "88b144af-7743-4824-a3b4-01839600bcbb"
+
+	mockRepository.EXPECT().FindByHash(context.Background(), gomock.Any()).Return(&domain.Link{
+		Hash:         hash,
+		OriginalURL:  originalURL,
+		UserID:       userId,
+		CreationTime: time.Now(),
+	}, nil)
+
+	mockRepository.EXPECT().Delete(context.Background(), gomock.Any()).Return(nil)
+
+	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
+	err := svc.Delete(context.Background(), hash, userId)
+
+	assert.Nil(t, err)
+}
+
+func TestLinkService_Delete_RepositoryFindErr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCounter := mock.NewMockCounter(ctrl)
+	mockEncoder := mock.NewMockEncoder(ctrl)
+	mockRepository := mock.NewMockLinkRepository(ctrl)
+
+	hash := "15saSAE"
+	userId := "88b144af-7743-4824-a3b4-01839600bcbb"
+
+	mockRepository.EXPECT().FindByHash(context.Background(), gomock.Any()).Return(nil, assert.AnError)
+
+	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
+	err := svc.Delete(context.Background(), hash, userId)
+
+	assert.NotNil(t, err)
+}
+
+func TestLinkService_Delete_UserErr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCounter := mock.NewMockCounter(ctrl)
+	mockEncoder := mock.NewMockEncoder(ctrl)
+	mockRepository := mock.NewMockLinkRepository(ctrl)
+
+	hash := "15saSAE"
+	originalURL := "http://github.com/hugosrc/shortlink"
+	userId := "88b144af-7743-4824-a3b4-01839600bcbb"
+	invalidUserID := "abae413b-1f02-4e8c-8895-3ab56f46b651"
+
+	mockRepository.EXPECT().FindByHash(context.Background(), gomock.Any()).Return(&domain.Link{
+		Hash:         hash,
+		OriginalURL:  originalURL,
+		UserID:       userId,
+		CreationTime: time.Now(),
+	}, nil)
+
+	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
+	err := svc.Delete(context.Background(), hash, invalidUserID)
+
+	assert.NotNil(t, err)
+}
+
+func TestLinkService_Delete_RepositoryDeleteErr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCounter := mock.NewMockCounter(ctrl)
+	mockEncoder := mock.NewMockEncoder(ctrl)
+	mockRepository := mock.NewMockLinkRepository(ctrl)
+
+	hash := "15saSAE"
+	originalURL := "http://github.com/hugosrc/shortlink"
+	userId := "88b144af-7743-4824-a3b4-01839600bcbb"
+
+	mockRepository.EXPECT().FindByHash(context.Background(), gomock.Any()).Return(&domain.Link{
+		Hash:         hash,
+		OriginalURL:  originalURL,
+		UserID:       userId,
+		CreationTime: time.Now(),
+	}, nil)
+	mockRepository.EXPECT().Delete(context.Background(), gomock.Any()).Return(assert.AnError)
+
+	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
+	err := svc.Delete(context.Background(), hash, userId)
+
+	assert.NotNil(t, err)
+}
+
+func TestLinkService_Update(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCounter := mock.NewMockCounter(ctrl)
+	mockEncoder := mock.NewMockEncoder(ctrl)
+	mockRepository := mock.NewMockLinkRepository(ctrl)
+
+	hash := "15saSAE"
+	originalURL := "http://github.com/hugosrc/shortlink"
+	newURL := "http://github.com/hugosrc/surf-forecast-api"
+	userId := "88b144af-7743-4824-a3b4-01839600bcbb"
+	creationTime := time.Now()
+
+	mockRepository.EXPECT().FindByHash(context.Background(), gomock.Any()).Return(&domain.Link{
+		Hash:         hash,
+		OriginalURL:  originalURL,
+		UserID:       userId,
+		CreationTime: creationTime,
+	}, nil)
+
+	mockRepository.EXPECT().Update(context.Background(), gomock.Any(), gomock.Any()).Return(&domain.Link{
+		Hash:         hash,
+		OriginalURL:  newURL,
+		UserID:       userId,
+		CreationTime: creationTime,
+	}, nil)
+
+	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
+	link, err := svc.Update(context.Background(), hash, newURL, userId)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, link)
+	assert.Equal(t, link.Hash, hash)
+	assert.Equal(t, link.OriginalURL, newURL)
+	assert.Equal(t, link.UserID, userId)
+	assert.Equal(t, link.CreationTime, creationTime)
+}
+
+func TestLinkService_Update_RepositoryFindErr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCounter := mock.NewMockCounter(ctrl)
+	mockEncoder := mock.NewMockEncoder(ctrl)
+	mockRepository := mock.NewMockLinkRepository(ctrl)
+
+	hash := "15saSAE"
+	newURL := "http://github.com/hugosrc/surf-forecast-api"
+	userId := "88b144af-7743-4824-a3b4-01839600bcbb"
+
+	mockRepository.EXPECT().FindByHash(context.Background(), gomock.Any()).Return(nil, assert.AnError)
+
+	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
+	link, err := svc.Update(context.Background(), hash, newURL, userId)
+
+	assert.NotNil(t, err)
+	assert.Nil(t, link)
+}
+
+func TestLinkService_Update_UserErr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCounter := mock.NewMockCounter(ctrl)
+	mockEncoder := mock.NewMockEncoder(ctrl)
+	mockRepository := mock.NewMockLinkRepository(ctrl)
+
+	hash := "15saSAE"
+	originalURL := "http://github.com/hugosrc/shortlink"
+	newURL := "http://github.com/hugosrc/surf-forecast-api"
+	userId := "88b144af-7743-4824-a3b4-01839600bcbb"
+	invalidUserID := "abae413b-1f02-4e8c-8895-3ab56f46b651"
+
+	mockRepository.EXPECT().FindByHash(context.Background(), gomock.Any()).Return(&domain.Link{
+		Hash:         hash,
+		OriginalURL:  originalURL,
+		UserID:       userId,
+		CreationTime: time.Now(),
+	}, nil)
+
+	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
+	link, err := svc.Update(context.Background(), hash, newURL, invalidUserID)
+
+	assert.NotNil(t, err)
+	assert.Nil(t, link)
+}
+
+func TestLinkService_Update_RepositoryUpdateErr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCounter := mock.NewMockCounter(ctrl)
+	mockEncoder := mock.NewMockEncoder(ctrl)
+	mockRepository := mock.NewMockLinkRepository(ctrl)
+
+	hash := "15saSAE"
+	originalURL := "http://github.com/hugosrc/shortlink"
+	newURL := "http://github.com/hugosrc/surf-forecast-api"
+	userId := "88b144af-7743-4824-a3b4-01839600bcbb"
+
+	mockRepository.EXPECT().FindByHash(context.Background(), gomock.Any()).Return(&domain.Link{
+		Hash:         hash,
+		OriginalURL:  originalURL,
+		UserID:       userId,
+		CreationTime: time.Now(),
+	}, nil)
+	mockRepository.EXPECT().Update(context.Background(), gomock.Any(), gomock.Any()).Return(nil, assert.AnError)
+
+	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
+	link, err := svc.Update(context.Background(), hash, newURL, userId)
+
+	assert.NotNil(t, err)
+	assert.Nil(t, link)
+}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"time"
 
@@ -51,4 +52,39 @@ func (s *LinkService) FindByHash(ctx context.Context, hash string) (string, erro
 	}
 
 	return link.OriginalURL, nil
+}
+
+func (s *LinkService) Delete(ctx context.Context, hash string, userID string) error {
+	link, err := s.repo.FindByHash(ctx, hash)
+	if err != nil {
+		return err
+	}
+
+	if link.UserID != userID {
+		return errors.New("user does not have permission")
+	}
+
+	if err := s.repo.Delete(ctx, hash); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *LinkService) Update(ctx context.Context, hash string, url string, userID string) (*domain.Link, error) {
+	link, err := s.repo.FindByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	if link.UserID != userID {
+		return nil, errors.New("user does not have permission")
+	}
+
+	updated, err := s.repo.Update(ctx, hash, url)
+	if err != nil {
+		return nil, err
+	}
+
+	return updated, nil
 }

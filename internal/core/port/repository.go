@@ -10,4 +10,6 @@ import (
 type LinkRepository interface {
 	Create(ctx context.Context, link *domain.Link) error
 	FindByHash(ctx context.Context, hash string) (*domain.Link, error)
+	Delete(ctx context.Context, hash string) error
+	Update(ctx context.Context, hash string, url string) (*domain.Link, error)
 }
