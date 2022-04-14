@@ -71,7 +71,7 @@ func (s *LinkService) Delete(ctx context.Context, hash string, userID string) er
 	return nil
 }
 
-func (s *LinkService) Update(ctx context.Context, hash string, url string, userID string) (*domain.Link, error) {
+func (s *LinkService) Update(ctx context.Context, hash string, newURL string, userID string) (*domain.Link, error) {
 	link, err := s.repo.FindByHash(ctx, hash)
 	if err != nil {
 		return nil, err
@@ -81,10 +81,14 @@ func (s *LinkService) Update(ctx context.Context, hash string, url string, userI
 		return nil, errors.New("user does not have permission")
 	}
 
-	updated, err := s.repo.Update(ctx, hash, url)
-	if err != nil {
+	if err := s.repo.Update(ctx, hash, newURL); err != nil {
 		return nil, err
 	}
 
-	return updated, nil
+	return &domain.Link{
+		Hash:         hash,
+		OriginalURL:  newURL,
+		UserID:       userID,
+		CreationTime: link.CreationTime,
+	}, nil
 }

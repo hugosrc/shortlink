@@ -244,12 +244,7 @@ func TestLinkService_Update(t *testing.T) {
 		CreationTime: creationTime,
 	}, nil)
 
-	mockRepository.EXPECT().Update(context.Background(), gomock.Any(), gomock.Any()).Return(&domain.Link{
-		Hash:         hash,
-		OriginalURL:  newURL,
-		UserID:       userId,
-		CreationTime: creationTime,
-	}, nil)
+	mockRepository.EXPECT().Update(context.Background(), gomock.Any(), gomock.Any()).Return(nil)
 
 	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
 	link, err := svc.Update(context.Background(), hash, newURL, userId)
@@ -330,7 +325,7 @@ func TestLinkService_Update_RepositoryUpdateErr(t *testing.T) {
 		UserID:       userId,
 		CreationTime: time.Now(),
 	}, nil)
-	mockRepository.EXPECT().Update(context.Background(), gomock.Any(), gomock.Any()).Return(nil, assert.AnError)
+	mockRepository.EXPECT().Update(context.Background(), gomock.Any(), gomock.Any()).Return(assert.AnError)
 
 	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
 	link, err := svc.Update(context.Background(), hash, newURL, userId)

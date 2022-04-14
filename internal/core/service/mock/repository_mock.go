@@ -79,16 +79,15 @@ func (mr *MockLinkRepositoryMockRecorder) FindByHash(ctx, hash interface{}) *gom
 }
 
 // Update mocks base method.
-func (m *MockLinkRepository) Update(ctx context.Context, hash, url string) (*domain.Link, error) {
+func (m *MockLinkRepository) Update(ctx context.Context, hash, newURL string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", ctx, hash, url)
-	ret0, _ := ret[0].(*domain.Link)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "Update", ctx, hash, newURL)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockLinkRepositoryMockRecorder) Update(ctx, hash, url interface{}) *gomock.Call {
+func (mr *MockLinkRepositoryMockRecorder) Update(ctx, hash, newURL interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockLinkRepository)(nil).Update), ctx, hash, url)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockLinkRepository)(nil).Update), ctx, hash, newURL)
 }
