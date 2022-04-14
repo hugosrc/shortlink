@@ -4,7 +4,6 @@ go 1.17
 
 require (
 	github.com/golang/mock v1.6.0
-	github.com/jxskiss/base62 v1.1.0
 	github.com/stretchr/testify v1.7.1
 )
 

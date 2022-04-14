@@ -49,17 +49,17 @@ func (mr *MockLinkRepositoryMockRecorder) Create(ctx, link interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockLinkRepository)(nil).Create), ctx, link)
 }
 
-// FindUrlByHash mocks base method.
-func (m *MockLinkRepository) FindUrlByHash(ctx context.Context, hash string) (string, error) {
+// FindByHash mocks base method.
+func (m *MockLinkRepository) FindByHash(ctx context.Context, hash string) (*domain.Link, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindUrlByHash", ctx, hash)
-	ret0, _ := ret[0].(string)
+	ret := m.ctrl.Call(m, "FindByHash", ctx, hash)
+	ret0, _ := ret[0].(*domain.Link)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// FindUrlByHash indicates an expected call of FindUrlByHash.
-func (mr *MockLinkRepositoryMockRecorder) FindUrlByHash(ctx, hash interface{}) *gomock.Call {
+// FindByHash indicates an expected call of FindByHash.
+func (mr *MockLinkRepositoryMockRecorder) FindByHash(ctx, hash interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUrlByHash", reflect.TypeOf((*MockLinkRepository)(nil).FindUrlByHash), ctx, hash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByHash", reflect.TypeOf((*MockLinkRepository)(nil).FindByHash), ctx, hash)
 }

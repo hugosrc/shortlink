@@ -8,5 +8,5 @@ import (
 
 type LinkService interface {
 	Create(ctx context.Context, url string, userID string) (*domain.Link, error)
-	FindUrlByHash(ctx context.Context, hash string) (string, error)
+	FindByHash(ctx context.Context, hash string) (string, error)
 }

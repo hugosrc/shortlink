@@ -3,8 +3,10 @@ package service_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/hugosrc/shortlink/internal/core/domain"
 	"github.com/hugosrc/shortlink/internal/core/service"
 	"github.com/hugosrc/shortlink/internal/core/service/mock"
 	"github.com/stretchr/testify/assert"
@@ -90,12 +92,17 @@ func TestLinkService_FindUrlByHash(t *testing.T) {
 	mockRepository := mock.NewMockLinkRepository(ctrl)
 
 	hash := "r74aASW"
-	originalURL := "88b144af-7743-4824-a3b4-01839600bcbb"
+	originalURL := "http://github.com/hugosrc/shortlink"
 
-	mockRepository.EXPECT().FindUrlByHash(context.Background(), hash).Return(originalURL, nil)
+	mockRepository.EXPECT().FindByHash(context.Background(), hash).Return(&domain.Link{
+		Hash:         hash,
+		OriginalURL:  originalURL,
+		UserID:       "88b144af-7743-4824-a3b4-01839600bcbb",
+		CreationTime: time.Now(),
+	}, nil)
 
 	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
-	url, err := svc.FindUrlByHash(context.Background(), hash)
+	url, err := svc.FindByHash(context.Background(), hash)
 
 	assert.Equal(t, originalURL, url)
 	assert.Nil(t, err)
@@ -109,10 +116,10 @@ func TestLinkService_FindUrlByHash_RepositoryErr(t *testing.T) {
 	mockEncoder := mock.NewMockEncoder(ctrl)
 	mockRepository := mock.NewMockLinkRepository(ctrl)
 
-	mockRepository.EXPECT().FindUrlByHash(context.Background(), gomock.Any()).Return("", assert.AnError)
+	mockRepository.EXPECT().FindByHash(context.Background(), gomock.Any()).Return(nil, assert.AnError)
 
 	svc := service.NewLinkService(mockCounter, mockEncoder, mockRepository)
-	url, err := svc.FindUrlByHash(context.Background(), "a74dAS1")
+	url, err := svc.FindByHash(context.Background(), "a74dAS1")
 
 	assert.Empty(t, url)
 	assert.NotNil(t, err)

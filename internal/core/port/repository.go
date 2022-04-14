@@ -9,5 +9,5 @@ import (
 // LinkRepository is an abstraction for accessing a data storage system.
 type LinkRepository interface {
 	Create(ctx context.Context, link *domain.Link) error
-	FindUrlByHash(ctx context.Context, hash string) (string, error)
+	FindByHash(ctx context.Context, hash string) (*domain.Link, error)
 }

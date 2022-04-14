@@ -44,11 +44,11 @@ func (s *LinkService) Create(ctx context.Context, url string, userID string) (*d
 	return link, nil
 }
 
-func (s *LinkService) FindUrlByHash(ctx context.Context, hash string) (string, error) {
-	url, err := s.repo.FindUrlByHash(ctx, hash)
+func (s *LinkService) FindByHash(ctx context.Context, hash string) (string, error) {
+	link, err := s.repo.FindByHash(ctx, hash)
 	if err != nil {
 		return "", err
 	}
 
-	return url, nil
+	return link.OriginalURL, nil
 }
