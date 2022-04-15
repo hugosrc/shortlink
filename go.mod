@@ -6,6 +6,7 @@ require (
 	github.com/go-zookeeper/zk v1.0.2
 	github.com/gocql/gocql v1.0.0
 	github.com/golang/mock v1.6.0
+	github.com/gorilla/mux v1.8.0
 	github.com/stretchr/testify v1.7.1
 )
 
