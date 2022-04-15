@@ -6,3 +6,9 @@ services:
     container_name: cassandra
     ports:
       - "9042:9042"
+
+  zookeeper:
+    image: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
