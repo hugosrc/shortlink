@@ -32,7 +32,7 @@ func (s *LinkService) Create(ctx context.Context, url string, userID string) (*d
 
 	hash := s.encoder.EncodeToString([]byte(strconv.Itoa(c)))
 	link := &domain.Link{
-		Hash:         hash,
+		Hash:         hash[0:7],
 		OriginalURL:  url,
 		UserID:       userID,
 		CreationTime: time.Now(),
