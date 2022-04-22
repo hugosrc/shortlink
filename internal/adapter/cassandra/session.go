@@ -1,18 +1,15 @@
 package cassandra
 
-import "github.com/gocql/gocql"
-
-const (
-	cassandraServer   string = "127.0.0.1:9042"
-	cassandraUser     string = "cassandra"
-	cassandraPassword string = "cassandra"
+import (
+	"github.com/gocql/gocql"
+	"github.com/spf13/viper"
 )
 
-func New() (*gocql.Session, error) {
-	cluster := gocql.NewCluster(cassandraServer)
+func New(conf viper.Viper) (*gocql.Session, error) {
+	cluster := gocql.NewCluster(conf.GetString("CASSANDRA_SERVER"))
 	cluster.Authenticator = gocql.PasswordAuthenticator{
-		Username: cassandraUser,
-		Password: cassandraPassword,
+		Username: conf.GetString("CASSANDRA_USER"),
+		Password: conf.GetString("CASSANDRA_PASSWORD"),
 	}
 
 	return cluster.CreateSession()

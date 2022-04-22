@@ -14,6 +14,7 @@ import (
 	"github.com/go-zookeeper/zk"
 	"github.com/gocql/gocql"
 	"github.com/gorilla/mux"
+	"github.com/hugosrc/shortlink/config"
 	"github.com/hugosrc/shortlink/internal/adapter/cassandra"
 	"github.com/hugosrc/shortlink/internal/adapter/cassandra/repository"
 	"github.com/hugosrc/shortlink/internal/adapter/zookeeper"
@@ -23,7 +24,7 @@ import (
 )
 
 func main() {
-	c, err := run(fmt.Sprintf(":%d", 8000)) // TODO: Get Port From Env Variables
+	c, err := run(fmt.Sprintf(":%d", 3000))
 	if err != nil {
 		log.Fatalf("couldn't start the server: %s", err.Error())
 	}
@@ -65,12 +66,14 @@ func newServer(conf serverConf) (*http.Server, error) {
 }
 
 func run(addr string) (<-chan error, error) {
-	dbSession, err := cassandra.New()
+	conf := config.Init()
+
+	dbSession, err := cassandra.New(conf)
 	if err != nil {
 		return nil, err
 	}
 
-	zkConn, err := zookeeper.New()
+	zkConn, err := zookeeper.New(conf)
 	if err != nil {
 		return nil, err
 	}
