@@ -5,23 +5,24 @@ import (
 	"time"
 
 	"github.com/go-zookeeper/zk"
+	"github.com/spf13/viper"
 )
 
-const (
-	zookeeperDefaultData = "10000"
-	zookeeperCounterPath = "/shorturl_seed"
-	zookeeperServer      = "127.0.0.1:2181"
+var (
+	zookeeperCounterPath = "/shortlink"
 )
 
-func New() (*zk.Conn, error) {
-	conn, _, err := zk.Connect([]string{zookeeperServer}, time.Second*5)
+func New(conf viper.Viper) (*zk.Conn, error) {
+	conn, _, err := zk.Connect([]string{conf.GetString("ZOOKEEPER_SERVER")}, time.Second*5)
 	if err != nil {
 		return nil, err
 	}
 
+	zookeeperCounterPath = conf.GetString("ZOOKEEPER_COUNTER_PATH")
+
 	if _, err := conn.Create(
-		zookeeperCounterPath,
-		[]byte(zookeeperDefaultData),
+		conf.GetString("ZOOKEEPER_COUNTER_PATH"),
+		[]byte(conf.GetString("ZOOKEEPER_COUNTER_DEFAULT_VALUE")),
 		0,
 		zk.WorldACL(zk.PermAll),
 	); err != nil && !errors.Is(err, zk.ErrNodeExists) {
