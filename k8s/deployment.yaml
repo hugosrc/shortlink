@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shortlink-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: shortlink-api
+  template:
+    metadata:
+      labels:
+        app: shortlink-api
+    spec:
+      containers:
+      - name: shortlink-api
+        image: DOCKERHUB_USER/IMAGE_NAME:TAG
+        ports:
+        - containerPort: 3000
