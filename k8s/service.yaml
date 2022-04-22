@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: shortlink-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: shortlink-api
+  ports:
+  - port: 80
+    targetPort: 3000
