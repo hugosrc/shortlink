@@ -15,7 +15,6 @@ func Init() viper.Viper {
 		log.Println(err)
 	}
 
-	config.SetEnvPrefix("SHORTLINK")
 	config.AutomaticEnv()
 
 	return *config
