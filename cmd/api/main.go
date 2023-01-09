@@ -11,12 +11,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-redis/redis/v9"
 	"github.com/go-zookeeper/zk"
 	"github.com/gocql/gocql"
 	"github.com/gorilla/mux"
 	"github.com/hugosrc/shortlink/config"
 	"github.com/hugosrc/shortlink/internal/adapter/cassandra"
 	"github.com/hugosrc/shortlink/internal/adapter/cassandra/repository"
+	redisAdapter "github.com/hugosrc/shortlink/internal/adapter/redis"
 	"github.com/hugosrc/shortlink/internal/adapter/zookeeper"
 	"github.com/hugosrc/shortlink/internal/core/service"
 	"github.com/hugosrc/shortlink/internal/handler/rest"
@@ -37,6 +39,7 @@ func main() {
 type serverConf struct {
 	Address   string
 	DB        *gocql.Session
+	RDB       *redis.Client
 	Zookeeper *zk.Conn
 }
 
@@ -49,9 +52,10 @@ func newServer(conf serverConf) (*http.Server, error) {
 	}
 
 	encoder := base62.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+	caching := redisAdapter.NewRedisCaching(conf.RDB)
 	repo := repository.NewLinkRepository(conf.DB)
 
-	svc := service.NewLinkService(counter, encoder, repo)
+	svc := service.NewLinkService(counter, encoder, caching, repo)
 
 	rest.NewLinkHandler(svc).Register(r)
 
@@ -73,6 +77,11 @@ func run(addr string) (<-chan error, error) {
 		return nil, err
 	}
 
+	rdbConn, err := redisAdapter.New(conf)
+	if err != nil {
+		return nil, err
+	}
+
 	zkConn, err := zookeeper.New(conf)
 	if err != nil {
 		return nil, err
@@ -81,6 +90,7 @@ func run(addr string) (<-chan error, error) {
 	srv, err := newServer(serverConf{
 		Address:   addr,
 		DB:        dbSession,
+		RDB:       rdbConn,
 		Zookeeper: zkConn,
 	})
 	if err != nil {
@@ -102,6 +112,7 @@ func run(addr string) (<-chan error, error) {
 
 		defer func() {
 			dbSession.Close()
+			rdbConn.Close()
 			zkConn.Close()
 			stop()
 			cancel()
