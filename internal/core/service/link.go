@@ -13,13 +13,15 @@ import (
 type LinkService struct {
 	counter port.Counter
 	encoder port.Encoder
+	caching port.LinkCaching
 	repo    port.LinkRepository
 }
 
-func NewLinkService(counter port.Counter, encoder port.Encoder, repo port.LinkRepository) port.LinkService {
+func NewLinkService(counter port.Counter, encoder port.Encoder, caching port.LinkCaching, repo port.LinkRepository) port.LinkService {
 	return &LinkService{
 		counter: counter,
 		encoder: encoder,
+		caching: caching,
 		repo:    repo,
 	}
 }
@@ -46,10 +48,18 @@ func (s *LinkService) Create(ctx context.Context, url string, userID string) (*d
 }
 
 func (s *LinkService) FindByHash(ctx context.Context, hash string) (string, error) {
+	url, _ := s.caching.Get(ctx, hash)
+
+	if len(url) > 0 {
+		return url, nil
+	}
+
 	link, err := s.repo.FindByHash(ctx, hash)
 	if err != nil {
 		return "", err
 	}
+
+	_ = s.caching.Set(ctx, hash, link.OriginalURL)
 
 	return link.OriginalURL, nil
 }
@@ -68,6 +78,8 @@ func (s *LinkService) Delete(ctx context.Context, hash string, userID string) er
 		return err
 	}
 
+	_ = s.caching.Del(ctx, hash)
+
 	return nil
 }
 
@@ -84,6 +96,8 @@ func (s *LinkService) Update(ctx context.Context, hash string, newURL string, us
 	if err := s.repo.Update(ctx, hash, newURL); err != nil {
 		return nil, err
 	}
+
+	_ = s.caching.Set(ctx, hash, newURL)
 
 	return &domain.Link{
 		Hash:         hash,

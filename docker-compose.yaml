@@ -12,3 +12,9 @@ services:
     container_name: zookeeper
     ports:
       - "2181:2181"
+
+  redis:
+    image: redis
+    container_name: redis
+    ports:
+      - "6379:6379"
