@@ -20,9 +20,9 @@ func NewLinkHandler(svc port.LinkService) *LinkHandler {
 
 func (h *LinkHandler) Register(r *mux.Router) {
 	r.HandleFunc("/{hash}", h.show).Methods(http.MethodGet)
-	r.HandleFunc("/", h.create).Methods(http.MethodPost)
-	r.HandleFunc("/{hash}", h.update).Methods(http.MethodPut)
-	r.HandleFunc("/{hash}", h.delete).Methods(http.MethodDelete)
+	r.HandleFunc("/api/shortlink", h.create).Methods(http.MethodPost)
+	r.HandleFunc("/api/shortlink/{hash}", h.update).Methods(http.MethodPut)
+	r.HandleFunc("/api/shortlink/{hash}", h.delete).Methods(http.MethodDelete)
 }
 
 func (h *LinkHandler) show(w http.ResponseWriter, r *http.Request) {
