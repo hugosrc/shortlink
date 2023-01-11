@@ -9,12 +9,14 @@ import (
 )
 
 type LinkHandler struct {
-	svc port.LinkService
+	auth port.Auth
+	svc  port.LinkService
 }
 
-func NewLinkHandler(svc port.LinkService) *LinkHandler {
+func NewLinkHandler(auth port.Auth, svc port.LinkService) *LinkHandler {
 	return &LinkHandler{
-		svc: svc,
+		auth: auth,
+		svc:  svc,
 	}
 }
 
@@ -42,13 +44,19 @@ type CreateLinkRequest struct {
 }
 
 func (h *LinkHandler) create(w http.ResponseWriter, r *http.Request) {
+	userID, err := h.auth.Authenticate(r, w)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
 	var req CreateLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	link, err := h.svc.Create(r.Context(), req.OriginalURL, "803681d8-7d3f-4078-989a-ae535a073624") // TODO: Add Auth System
+	link, err := h.svc.Create(r.Context(), req.OriginalURL, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -65,6 +73,12 @@ type UpdateLinkRequest struct {
 }
 
 func (h *LinkHandler) update(w http.ResponseWriter, r *http.Request) {
+	userID, err := h.auth.Authenticate(r, w)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
 	var req UpdateLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -72,7 +86,7 @@ func (h *LinkHandler) update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vars := mux.Vars(r)
-	link, err := h.svc.Update(r.Context(), vars["hash"], req.OriginalURL, "803681d8-7d3f-4078-989a-ae535a073624")
+	link, err := h.svc.Update(r.Context(), vars["hash"], req.OriginalURL, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -85,9 +99,15 @@ func (h *LinkHandler) update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LinkHandler) delete(w http.ResponseWriter, r *http.Request) {
+	userID, err := h.auth.Authenticate(r, w)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
 	vars := mux.Vars(r)
 
-	err := h.svc.Delete(r.Context(), vars["hash"], "803681d8-7d3f-4078-989a-ae535a073624")
+	err = h.svc.Delete(r.Context(), vars["hash"], userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

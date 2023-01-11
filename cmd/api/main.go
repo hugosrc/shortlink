@@ -18,6 +18,7 @@ import (
 	"github.com/hugosrc/shortlink/config"
 	"github.com/hugosrc/shortlink/internal/adapter/cassandra"
 	"github.com/hugosrc/shortlink/internal/adapter/cassandra/repository"
+	"github.com/hugosrc/shortlink/internal/adapter/keycloak"
 	redisAdapter "github.com/hugosrc/shortlink/internal/adapter/redis"
 	"github.com/hugosrc/shortlink/internal/adapter/zookeeper"
 	"github.com/hugosrc/shortlink/internal/core/service"
@@ -38,6 +39,7 @@ func main() {
 
 type serverConf struct {
 	Address   string
+	Auth      *keycloak.OpenIDAuth
 	DB        *gocql.Session
 	RDB       *redis.Client
 	Zookeeper *zk.Conn
@@ -57,7 +59,7 @@ func newServer(conf serverConf) (*http.Server, error) {
 
 	svc := service.NewLinkService(counter, encoder, caching, repo)
 
-	rest.NewLinkHandler(svc).Register(r)
+	rest.NewLinkHandler(conf.Auth, svc).Register(r)
 
 	return &http.Server{
 		Addr:              conf.Address,
@@ -87,8 +89,11 @@ func run(addr string) (<-chan error, error) {
 		return nil, err
 	}
 
+	auth := keycloak.NewOpenIDAuth(conf)
+
 	srv, err := newServer(serverConf{
 		Address:   addr,
+		Auth:      auth,
 		DB:        dbSession,
 		RDB:       rdbConn,
 		Zookeeper: zkConn,
