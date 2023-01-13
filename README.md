@@ -1,4 +1,4 @@
-# Shortlink
+# ShortLink
 
 Highly available and scalable URL shortening service.
 
@@ -9,11 +9,19 @@ Highly available and scalable URL shortening service.
   - [Requirements](#requirements)
     - [Functional](#functional)
     - [Non-Functional](#non-functional)
-  - [Desisions](#desisions)
+  - [Decisions](#decisions)
+    - [Tools](#tools)
     - [Microservices](#microservices)
     - [Hashing](#hashing)
     - [Database](#database)
-    - [Tools](#tools)
+    - [Caching](#caching)
+- [Development](#development)
+  - [Setup](#setup)
+    - [Keycloak](#keycloak)
+    - [Cassandra](#cassandra)
+    - [Redis](#redis)
+    - [Zookeeper](#zookeeper)
+    - [Start Server](#start-server)
 - [Contact](#contact)
 
 # Overview
@@ -28,7 +36,7 @@ Shortlink is a highly scalable and available service that allows users to shorte
 
 - Given a URL, the service should generate a link short enough to be easily copied and shared between applications and users.
 - When users access a short link, the service should redirect them to the original link. 
-- Users should be able to access metrics about their link redirects..
+- Users should be able to access metrics about their link redirects.
 - The service should also be accessible through REST APIs by other services.
 
 ### Non-Functional
@@ -36,7 +44,18 @@ Shortlink is a highly scalable and available service that allows users to shorte
 - The system should be highly available, because if the service is down, all URL redirections will start failing. 
 - URL redirection should happen with minimal latency. 
 
-## Desisions
+## Decisions
+
+### Tools
+
+- [Go (Golang)](https://golang.org/)
+- [Cassandra](https://cassandra.apache.org)
+- [Redis](https://redis.io/)
+- [Zookeeper](https://zookeeper.apache.org/)
+- [Keycloak](https://www.keycloak.org/)
+- [Docker](https://www.docker.com/)
+- [Kubernetes](https://kubernetes.io/)
+- [GitHub Actions](https://github.com/features/actions)
 
 ### Microservices
 
@@ -44,7 +63,7 @@ As one of the non-functional requirements of the application requires a highly a
 
 | ![architecture](docs/img/architecture.png) | 
 |:--:| 
-| *The above representation image rules out authentication systems, metric services and log services.* |
+| *The above representation image rules out authorization system, metric services and log services.* |
 
 ### Hashing
 
@@ -60,15 +79,128 @@ Base62 - [A-Z,a-z,0-9] 62 characters
 
 Ex: shorturl.example/a58BT17u
 
+Therefore, a hash length of 7 characters is enough for creating multiple URLs and at the same time short enough for easy sharing.
+
 ### Database
 
-This service is read-heavy, that is, it has more read requests than writes, and it doesn't have many relationships between the data. Therefore, the best option for this use case is to use a non-relational (NoSQL) storage system, which allows for data storage in a distributed manner. Consequently, the database chosen was Cassandra, another advantage of using it is the amount of data that will be stored in the system (approximately 3.8 trillion pieces of data).
+This service is read-heavy, that is, it has more read requests than writes, and it doesn't have many relationships between the data. Therefore, the best option for this use case is to use a non-relational (NoSQL) storage system, which allows for data storage in a distributed manner. Consequently, the database chosen was Cassandra.
 
-### Tools
+Cassandra is an open source NoSQL distributed database designed to handle large amounts of data across multiple servers, providing high read and write throughput.
 
-- [Go (Golang)](https://golang.org/)
-- [Cassandra](https://cassandra.apache.org)
-- [Zookeeper](https://zookeeper.apache.org/)
-- [Kafka](https://kafka.apache.org/)
-- [Docker](https://www.docker.com/)
-- [Kubernetes](https://kubernetes.io/)
+### Caching
+
+Caching is an efficient way to improve the performance of reads on the system, reducing the load on the database server. 
+
+Since one of the system requirements is the minimum latency in redirecting URLs, the caching service is essential, given the fact that retrieving data from the database server is a time-consuming process. Therefore, when implementing a cache system it is possible to store the hash and the respective URL in an in-memory data store, allowing much faster access.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant WebServer
+    participant CacheServer
+    participant Database
+
+    User ->>+ WebServer:  HTTP GET /{hash}
+
+    WebServer ->>+ CacheServer: get value by key {hash}
+    
+    CacheServer ->>- WebServer: null or matching URL
+
+    WebServer ->>+ Database: query to retrieve original url
+        Note over WebServer,Database: In case of null value in cache
+
+    Database ->>- WebServer: null or matching URL
+
+    WebServer ->>- User:  Response
+        Note over WebServer,User: Redirection or Not Found
+```
+*The representation image above shows the flow of a GET request using the cache layer.*
+
+For this, redis was the chosen data store, due to its powerful distributed caching mechanism that provides key-value pair caching with very low latency, among other features.
+
+## Development
+
+***OBS: follow these steps only for development environment.***
+
+### Setup
+
+1. clone the repository 
+```sh
+git clone https://github.com/hugosrc/shortlink.git
+```
+
+2. change directory
+```
+cd shortlink
+```
+
+3. copy the environment variables 
+```sh
+cp .env-example .env
+```
+
+#### Keycloak
+
+1. start docker container 
+```
+docker compose up -d keycloak
+```
+
+2. Access in the browser: http://localhost:8080
+3. Access the Administration Console
+4. Sign in. ```user: admin password: admin```
+5. Create a Realm
+6. In Resource file, click on browse file and select the [shortlink-realm.json](/keycloak/scripts/shortlink-realm.json) file, then press the create button
+7. In Clients, select link-service credentials and regenerate the client secret
+
+#### Cassandra
+
+1. start docker container 
+```
+docker compose up -d cassandra
+```
+
+2. Run the queries below on the cassandra database server
+
+```sql
+CREATE KEYSPACE shortlink 
+  WITH REPLICATION = { 
+    'class' : 'SimpleStra tegy', 
+    'replication_factor' : 1 
+    };
+
+CREATE TABLE shortlink.url_mapping (
+  hash VARCHAR,
+  original_url VARCHAR,
+  user_id UUID, 
+  creation_time TIMESTAMP,
+  PRIMARY KEY (hash)
+);
+
+CREATE INDEX user_idx ON shortlink.url_mapping (user_id);
+```
+
+#### Redis
+
+1. start docker container 
+```
+docker compose up -d redis
+```
+
+#### Zookeeper
+
+1. start docker container 
+```
+docker compose up -d zookeeper
+```
+
+#### Start Server
+
+All done, now just start the server 
+```sh
+go run cmd/api/main.go
+```
+
+## Contact
+
+You can reach me on my [LinkedIn](https://www.linkedin.com/in/hugosrc/)
