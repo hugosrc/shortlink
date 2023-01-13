@@ -20,7 +20,7 @@ func NewLinkRepository(conn *gocql.Session) port.LinkRepository {
 
 func (r *LinkRepository) Create(ctx context.Context, link *domain.Link) error {
 	if err := r.conn.Query(
-		"INSERT INTO shorturl.url_mapping (hash, original_url, user_id, creation_time) VALUES (?, ?, ?, ?);",
+		"INSERT INTO shortlink.url_mapping (hash, original_url, user_id, creation_time) VALUES (?, ?, ?, ?);",
 		link.Hash,
 		link.OriginalURL,
 		link.UserID,
@@ -34,7 +34,7 @@ func (r *LinkRepository) Create(ctx context.Context, link *domain.Link) error {
 
 func (r *LinkRepository) Delete(ctx context.Context, hash string) error {
 	if err := r.conn.Query(
-		"DELETE FROM shorturl.url_mapping WHERE hash = ?;",
+		"DELETE FROM shortlink.url_mapping WHERE hash = ?;",
 		hash,
 	).WithContext(ctx).Exec(); err != nil {
 		return err
@@ -46,7 +46,7 @@ func (r *LinkRepository) Delete(ctx context.Context, hash string) error {
 func (r *LinkRepository) FindByHash(ctx context.Context, hash string) (*domain.Link, error) {
 	var link domain.Link
 	if err := r.conn.Query(
-		"SELECT hash, original_url, user_id, creation_time FROM shorturl.url_mapping WHERE hash = ?;", hash,
+		"SELECT hash, original_url, user_id, creation_time FROM shortlink.url_mapping WHERE hash = ?;", hash,
 	).WithContext(ctx).Consistency(gocql.One).Scan(
 		&link.Hash,
 		&link.OriginalURL,
@@ -61,7 +61,7 @@ func (r *LinkRepository) FindByHash(ctx context.Context, hash string) (*domain.L
 
 func (r *LinkRepository) Update(ctx context.Context, hash string, newURL string) error {
 	if err := r.conn.Query(
-		"UPDATE shorturl.url_mapping SET original_url = ? WHERE hash = ?;",
+		"UPDATE shortlink.url_mapping SET original_url = ? WHERE hash = ?;",
 		newURL,
 		hash,
 	).WithContext(ctx).Exec(); err != nil {

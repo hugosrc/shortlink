@@ -136,7 +136,7 @@ cd shortlink
 
 3. copy the environment variables 
 ```sh
-cp .env-example .env
+cp .env.example .env
 ```
 
 #### Keycloak
