@@ -3,13 +3,12 @@ package keycloak
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/hugosrc/shortlink/internal/util"
 	"github.com/spf13/viper"
 	jose "gopkg.in/square/go-jose.v2"
 )
@@ -27,51 +26,51 @@ func NewOpenIDAuth(config viper.Viper) *OpenIDAuth {
 func (oidc *OpenIDAuth) Authenticate(r *http.Request, w http.ResponseWriter) (string, error) {
 	authHeader := r.Header.Get("Authorization")
 	if len(authHeader) == 0 {
-		return "", errors.New("jwt token not provided")
+		return "", util.NewErrorf(util.ErrCodeUnauthorized, "jwt token not provided")
 	}
 
 	bearerToken := strings.Split(authHeader, "Bearer")
 	if len(bearerToken) != 2 {
-		return "", errors.New("authorization header does not follow the format 'Authorization: Bearer <string with JWT>'")
+		return "", util.NewErrorf(util.ErrCodeUnauthorized, "authorization header does not follow the format 'Authorization: Bearer <string with JWT>'")
 	}
 
 	token := bearerToken[1]
 
 	claims, err := oidc.parseIDToken(token)
 	if err != nil {
-		return "", err
+		return "", util.WrapErrorf(err, util.ErrCodeUnauthorized, "parse token")
 	}
 
 	audience := oidc.config.GetString("KEYCLOAK_OIDC_AUDIENCE")
 	if err := oidc.verifyAudience(claims, audience); err != nil {
-		return "", err
+		return "", util.WrapErrorf(err, util.ErrCodeUnauthorized, "token audience")
 	}
 
 	authorizedParty := oidc.config.GetString("KEYCLOAK_OIDC_AUTHORIZED_PARTY")
 	if err := oidc.verifyAuthorizedParty(claims, authorizedParty); err != nil {
-		return "", err
+		return "", util.WrapErrorf(err, util.ErrCodeUnauthorized, "token aud")
 	}
 
 	if err := oidc.verifyExpiry(claims); err != nil {
-		return "", err
+		return "", util.WrapErrorf(err, util.ErrCodeUnauthorized, "token expiry")
 	}
 
 	if err := oidc.getSignatureKeys(oidc.config); err != nil {
-		return "", err
+		return "", util.WrapErrorf(err, util.ErrCodeUnauthorized, "token signature keys")
 	}
 
 	if err := oidc.verifySignature(token, oidc.config); err != nil {
-		return "", err
+		return "", util.WrapErrorf(err, util.ErrCodeUnauthorized, "token signature")
 	}
 
 	issuer := oidc.config.GetString("KEYCLOAK_OIDC_ISSUER")
 	if err := oidc.verifyIssuer(claims, issuer); err != nil {
-		return "", err
+		return "", util.WrapErrorf(err, util.ErrCodeUnauthorized, "token issuer")
 	}
 
 	userID, err := oidc.getTokenField(claims, "sub")
 	if err != nil {
-		return "", err
+		return "", util.WrapErrorf(err, util.ErrCodeUnauthorized, "token field")
 	}
 
 	return userID, nil
@@ -82,16 +81,16 @@ func (oidc *OpenIDAuth) parseIDToken(token string) (map[string]interface{}, erro
 
 	tokenParts := strings.Split(token, ".")
 	if len(tokenParts) < 2 {
-		return claims, errors.New("malformed jwt token")
+		return claims, util.NewErrorf(util.ErrCodeUnknown, "malformed jwt token")
 	}
 
 	parsedToken, err := base64.RawURLEncoding.DecodeString(tokenParts[1])
 	if err != nil {
-		return claims, err
+		return claims, util.WrapErrorf(err, util.ErrCodeUnknown, "error decoding token")
 	}
 
 	if err := json.Unmarshal(parsedToken, &claims); err != nil {
-		return claims, err
+		return claims, util.WrapErrorf(err, util.ErrCodeUnknown, "json unmarshal error")
 	}
 
 	return claims, nil
@@ -102,7 +101,7 @@ func (oidc *OpenIDAuth) verifyAudience(claims map[string]interface{}, audience s
 
 	tokenAud, ok := claims["aud"]
 	if !ok {
-		return errors.New("token issued without audience")
+		return util.NewErrorf(util.ErrCodeUnknown, "token issued without audience")
 	}
 
 	tokenAudiences, ok := tokenAud.([]interface{})
@@ -115,7 +114,7 @@ func (oidc *OpenIDAuth) verifyAudience(claims map[string]interface{}, audience s
 		if ok {
 			audiences = append(audiences, aud)
 		} else {
-			return errors.New("invalid audience type")
+			return util.NewErrorf(util.ErrCodeUnknown, "invalid audience type")
 		}
 	}
 
@@ -127,7 +126,7 @@ func (oidc *OpenIDAuth) verifyAudience(claims map[string]interface{}, audience s
 	}
 
 	if !fail {
-		return errors.New("token issued to another audience")
+		return util.NewErrorf(util.ErrCodeUnknown, "token issued to another audience")
 	}
 
 	return nil
@@ -140,7 +139,7 @@ func (oidc *OpenIDAuth) verifyAuthorizedParty(claims map[string]interface{}, azp
 	}
 
 	if tokenAzp != azp {
-		return errors.New("token issued to another authorized party")
+		return util.NewErrorf(util.ErrCodeUnknown, "token issued to another authorized party")
 	}
 
 	return nil
@@ -149,11 +148,11 @@ func (oidc *OpenIDAuth) verifyAuthorizedParty(claims map[string]interface{}, azp
 func (oidc *OpenIDAuth) verifyExpiry(claims map[string]interface{}) error {
 	tokenExp, ok := claims["exp"].(float64)
 	if !ok {
-		return errors.New("token issued without exp")
+		return util.NewErrorf(util.ErrCodeUnknown, "token issued without exp")
 	}
 
 	if time.Time(time.Unix(int64(tokenExp), 0)).Before(time.Now()) {
-		return errors.New("token is expired")
+		return util.NewErrorf(util.ErrCodeUnknown, "token is expired")
 	}
 
 	return nil
@@ -172,27 +171,27 @@ func (oidc *OpenIDAuth) getSignatureKeys(config viper.Viper) error {
 	jwksURL := oidc.config.GetString("KEYCLOAK_OIDC_CERTS")
 	req, err := http.NewRequest(http.MethodGet, jwksURL, nil)
 	if err != nil {
-		return err
+		return util.WrapErrorf(err, util.ErrCodeUnknown, "error creating request")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return util.WrapErrorf(err, util.ErrCodeUnknown, "error during http request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to get jwt keys")
+		return util.NewErrorf(util.ErrCodeUnknown, "failed to get jwt keys")
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return util.WrapErrorf(err, util.ErrCodeUnknown, "readall error")
 	}
 
 	if err := json.Unmarshal(body, &keySet); err != nil {
-		return err
+		return util.WrapErrorf(err, util.ErrCodeUnknown, "json unmarshal error")
 	}
 
 	config.Set("oidc_keys", keySet)
@@ -203,7 +202,7 @@ func (oidc *OpenIDAuth) getSignatureKeys(config viper.Viper) error {
 func (oidc *OpenIDAuth) verifySignature(token string, config viper.Viper) error {
 	jws, err := jose.ParseSigned(token)
 	if err != nil {
-		return err
+		return util.WrapErrorf(err, util.ErrCodeUnknown, "signature verification error")
 	}
 
 	keySet := config.Get("oidc_keys").(jose.JSONWebKeySet)
@@ -215,8 +214,9 @@ func (oidc *OpenIDAuth) verifySignature(token string, config viper.Viper) error 
 			fails++
 		}
 	}
+
 	if fails == len(keySet.Keys) {
-		return errors.New("invalid token signature")
+		return util.NewErrorf(util.ErrCodeUnknown, "invalid token signature")
 	}
 
 	return nil
@@ -225,11 +225,11 @@ func (oidc *OpenIDAuth) verifySignature(token string, config viper.Viper) error 
 func (oidc *OpenIDAuth) verifyIssuer(claims map[string]interface{}, issuer string) error {
 	tokenIssuer, ok := claims["iss"].(string)
 	if !ok {
-		return errors.New("token issuer is invalid")
+		return util.NewErrorf(util.ErrCodeUnknown, "token issuer is invalid")
 	}
 
 	if tokenIssuer != issuer {
-		return errors.New("unrecognized token issuer")
+		return util.NewErrorf(util.ErrCodeUnknown, "unrecognized token issuer")
 	}
 
 	return nil
@@ -238,7 +238,7 @@ func (oidc *OpenIDAuth) verifyIssuer(claims map[string]interface{}, issuer strin
 func (oidc *OpenIDAuth) getTokenField(claims map[string]interface{}, field string) (string, error) {
 	tokenField, ok := claims[field].(string)
 	if !ok {
-		return "", fmt.Errorf("token issued without %s", field)
+		return "", util.NewErrorf(util.ErrCodeUnknown, "token issued without %s", field)
 	}
 
 	return tokenField, nil

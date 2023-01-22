@@ -2,10 +2,12 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/gocql/gocql"
 	"github.com/hugosrc/shortlink/internal/core/domain"
 	"github.com/hugosrc/shortlink/internal/core/port"
+	"github.com/hugosrc/shortlink/internal/util"
 )
 
 type LinkRepository struct {
@@ -26,7 +28,7 @@ func (r *LinkRepository) Create(ctx context.Context, link *domain.Link) error {
 		link.UserID,
 		link.CreationTime,
 	).WithContext(ctx).Exec(); err != nil {
-		return err
+		return util.WrapErrorf(err, util.ErrCodeUnknown, "error inserting url")
 	}
 
 	return nil
@@ -37,7 +39,7 @@ func (r *LinkRepository) Delete(ctx context.Context, hash string) error {
 		"DELETE FROM shortlink.url_mapping WHERE hash = ?;",
 		hash,
 	).WithContext(ctx).Exec(); err != nil {
-		return err
+		return util.WrapErrorf(err, util.ErrCodeUnknown, "error deleting url")
 	}
 
 	return nil
@@ -53,7 +55,11 @@ func (r *LinkRepository) FindByHash(ctx context.Context, hash string) (*domain.L
 		&link.UserID,
 		&link.CreationTime,
 	); err != nil {
-		return nil, err
+		if errors.Is(err, gocql.ErrNotFound) {
+			return nil, util.WrapErrorf(err, util.ErrCodeNotFound, "url not found")
+		}
+
+		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "error retrieving url")
 	}
 
 	return &link, nil
@@ -65,7 +71,7 @@ func (r *LinkRepository) Update(ctx context.Context, hash string, newURL string)
 		newURL,
 		hash,
 	).WithContext(ctx).Exec(); err != nil {
-		return err
+		return util.WrapErrorf(err, util.ErrCodeUnknown, "error updating url")
 	}
 
 	return nil
