@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/hugosrc/shortlink/internal/core/port"
+	"github.com/hugosrc/shortlink/internal/util"
 )
 
 type LinkHandler struct {
@@ -32,11 +33,11 @@ func (h *LinkHandler) show(w http.ResponseWriter, r *http.Request) {
 
 	url, err := h.svc.FindByHash(r.Context(), vars["hash"])
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handleError(w, err, "An internal error has occurred. Please try again later.")
 		return
 	}
 
-	http.Redirect(w, r, url, http.StatusMovedPermanently)
+	http.Redirect(w, r, url, http.StatusFound)
 }
 
 type CreateLinkRequest struct {
@@ -44,28 +45,29 @@ type CreateLinkRequest struct {
 }
 
 func (h *LinkHandler) create(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	userID, err := h.auth.Authenticate(r, w)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		handleError(w, err, "Invalid authentication credentials")
 		return
 	}
 
 	var req CreateLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handleError(w, util.WrapErrorf(err, util.ErrCodeInvalidArgument, "json decode"),
+			"Invalid request format")
 		return
 	}
 
 	link, err := h.svc.Create(r.Context(), req.OriginalURL, userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handleError(w, err, "An internal error has occurred. Please try again later.")
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(&link); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(&link)
 }
 
 type UpdateLinkRequest struct {
@@ -73,35 +75,36 @@ type UpdateLinkRequest struct {
 }
 
 func (h *LinkHandler) update(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	userID, err := h.auth.Authenticate(r, w)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		handleError(w, err, "Invalid authentication credentials")
 		return
 	}
 
 	var req UpdateLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handleError(w, util.WrapErrorf(err, util.ErrCodeInvalidArgument, "json decode"),
+			"Invalid request format")
 		return
 	}
 
 	vars := mux.Vars(r)
 	link, err := h.svc.Update(r.Context(), vars["hash"], req.OriginalURL, userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handleError(w, err, "An internal error has occurred. Please try again later.")
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(&link); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(&link)
 }
 
 func (h *LinkHandler) delete(w http.ResponseWriter, r *http.Request) {
 	userID, err := h.auth.Authenticate(r, w)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		handleError(w, err, "Invalid authentication credentials")
 		return
 	}
 
@@ -109,7 +112,7 @@ func (h *LinkHandler) delete(w http.ResponseWriter, r *http.Request) {
 
 	err = h.svc.Delete(r.Context(), vars["hash"], userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		handleError(w, err, "An internal error has occurred. Please try again later.")
 		return
 	}
 
