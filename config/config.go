@@ -1,21 +1,20 @@
 package config
 
 import (
-	"log"
-
+	"github.com/hugosrc/shortlink/internal/util"
 	"github.com/spf13/viper"
 )
 
-func Init() viper.Viper {
+func Init() (*viper.Viper, error) {
 	config := viper.New()
 
 	config.AddConfigPath(".")
 	config.SetConfigFile(".env")
 	if err := config.ReadInConfig(); err != nil {
-		log.Println(err)
+		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "error")
 	}
 
 	config.AutomaticEnv()
 
-	return *config
+	return config, nil
 }

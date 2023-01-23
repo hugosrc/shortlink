@@ -2,12 +2,12 @@ package service
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"time"
 
 	"github.com/hugosrc/shortlink/internal/core/domain"
 	"github.com/hugosrc/shortlink/internal/core/port"
+	"github.com/hugosrc/shortlink/internal/util"
 )
 
 type LinkService struct {
@@ -71,7 +71,7 @@ func (s *LinkService) Delete(ctx context.Context, hash string, userID string) er
 	}
 
 	if link.UserID != userID {
-		return errors.New("user does not have permission")
+		return util.NewErrorf(util.ErrCodeUnauthorized, "user does not have permission")
 	}
 
 	if err := s.repo.Delete(ctx, hash); err != nil {
@@ -90,7 +90,7 @@ func (s *LinkService) Update(ctx context.Context, hash string, newURL string, us
 	}
 
 	if link.UserID != userID {
-		return nil, errors.New("user does not have permission")
+		return nil, util.NewErrorf(util.ErrCodeUnauthorized, "user does not have permission")
 	}
 
 	if err := s.repo.Update(ctx, hash, newURL); err != nil {
