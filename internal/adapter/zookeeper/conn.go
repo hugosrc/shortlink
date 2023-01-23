@@ -13,7 +13,7 @@ var (
 	zookeeperCounterPath = "/shortlink"
 )
 
-func New(conf viper.Viper) (*zk.Conn, error) {
+func New(conf *viper.Viper) (*zk.Conn, error) {
 	conn, _, err := zk.Connect([]string{conf.GetString("ZOOKEEPER_SERVER")}, time.Second*5)
 	if err != nil {
 		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "error connecting to zookeeper")

@@ -23,6 +23,7 @@ import (
 	"github.com/hugosrc/shortlink/internal/adapter/zookeeper"
 	"github.com/hugosrc/shortlink/internal/core/service"
 	"github.com/hugosrc/shortlink/internal/handler/rest"
+	"github.com/hugosrc/shortlink/internal/util"
 	"github.com/jxskiss/base62"
 )
 
@@ -72,21 +73,24 @@ func newServer(conf serverConf) (*http.Server, error) {
 }
 
 func run(addr string) (<-chan error, error) {
-	conf := config.Init()
+	conf, err := config.Init()
+	if err != nil {
+		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "configuration initialization")
+	}
 
 	dbSession, err := cassandra.New(conf)
 	if err != nil {
-		return nil, err
+		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "new cassandra server connection")
 	}
 
 	rdbConn, err := redisAdapter.New(conf)
 	if err != nil {
-		return nil, err
+		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "new redis server connection")
 	}
 
 	zkConn, err := zookeeper.New(conf)
 	if err != nil {
-		return nil, err
+		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "new zookeeper server connection")
 	}
 
 	auth := keycloak.NewOpenIDAuth(conf)

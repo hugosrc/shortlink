@@ -14,10 +14,10 @@ import (
 )
 
 type OpenIDAuth struct {
-	config viper.Viper
+	config *viper.Viper
 }
 
-func NewOpenIDAuth(config viper.Viper) *OpenIDAuth {
+func NewOpenIDAuth(config *viper.Viper) *OpenIDAuth {
 	return &OpenIDAuth{
 		config: config,
 	}
@@ -158,7 +158,7 @@ func (oidc *OpenIDAuth) verifyExpiry(claims map[string]interface{}) error {
 	return nil
 }
 
-func (oidc *OpenIDAuth) getSignatureKeys(config viper.Viper) error {
+func (oidc *OpenIDAuth) getSignatureKeys(config *viper.Viper) error {
 	var keySet jose.JSONWebKeySet
 
 	keys := config.Get("oidc_keys")
@@ -199,7 +199,7 @@ func (oidc *OpenIDAuth) getSignatureKeys(config viper.Viper) error {
 	return nil
 }
 
-func (oidc *OpenIDAuth) verifySignature(token string, config viper.Viper) error {
+func (oidc *OpenIDAuth) verifySignature(token string, config *viper.Viper) error {
 	jws, err := jose.ParseSigned(token)
 	if err != nil {
 		return util.WrapErrorf(err, util.ErrCodeUnknown, "signature verification error")
