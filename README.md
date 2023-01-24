@@ -165,7 +165,7 @@ docker compose up -d cassandra
 ```sql
 CREATE KEYSPACE shortlink 
   WITH REPLICATION = { 
-    'class' : 'SimpleStra tegy', 
+    'class' : 'SimpleStrategy', 
     'replication_factor' : 1 
     };
 
