@@ -9,9 +9,14 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/jxskiss/base62 v1.1.0
 	github.com/spf13/viper v1.11.0
+	go.uber.org/zap v1.24.0
 )
 
-require golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
+require (
+	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/multierr v1.6.0 // indirect
+	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
+)
 
 require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect

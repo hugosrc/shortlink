@@ -23,44 +23,120 @@ import (
 	"github.com/hugosrc/shortlink/internal/adapter/zookeeper"
 	"github.com/hugosrc/shortlink/internal/core/service"
 	"github.com/hugosrc/shortlink/internal/handler/rest"
-	"github.com/hugosrc/shortlink/internal/util"
 	"github.com/jxskiss/base62"
+	"go.uber.org/zap"
 )
 
 func main() {
-	c, err := run(fmt.Sprintf(":%d", 3000))
+	logger, err := zap.NewProduction()
 	if err != nil {
-		log.Fatalf("couldn't start the server: %s", err.Error())
+		log.Fatalf("couldn't initialize zap logger: %v", err)
+		os.Exit(1)
 	}
 
-	if err := <-c; err != nil {
-		log.Fatalf("an error occurred during execution: %s", err.Error())
+	config, err := config.Init()
+	if err != nil {
+		logger.Error("couldn't initialize configuration", zap.Error(err))
+		os.Exit(1)
 	}
+
+	cassandraConn, err := cassandra.New(config)
+	if err != nil {
+		logger.Error("couldn't connect to cassandra: %s", zap.Error(err))
+		os.Exit(1)
+	}
+
+	redisConn, err := redisAdapter.New(config)
+	if err != nil {
+		logger.Error("couldn't connect to redis: %s", zap.Error(err))
+		os.Exit(1)
+	}
+
+	zookeeperConn, err := zookeeper.New(config)
+	if err != nil {
+		logger.Error("couldn't connect to zookeeper: %s", zap.Error(err))
+		os.Exit(1)
+	}
+
+	keycloakAuth := keycloak.NewOpenIDAuth(config)
+
+	logMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			logger.Info("received request", zap.String("method", r.Method), zap.String("uri", r.RequestURI))
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	server := newServer(serverConf{
+		Address:     fmt.Sprintf(":%d", 3000),
+		Auth:        keycloakAuth,
+		Cassandra:   cassandraConn,
+		Redis:       redisConn,
+		Zookeeper:   zookeeperConn,
+		Middlewares: []func(next http.Handler) http.Handler{logMiddleware},
+	})
+
+	go func() {
+		logger.Info("server started")
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("couldn't start the server", zap.Error(err))
+		}
+	}()
+
+	done := make(chan os.Signal)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	<-done
+
+	logger.Info("shutdown signal received")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	defer func() {
+		if err := redisConn.Close(); err != nil {
+			logger.Error("error closing redis connection", zap.Error(err))
+		}
+
+		cassandraConn.Close()
+		zookeeperConn.Close()
+		cancel()
+		close(done)
+	}()
+
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("couldn't gracefully shutdown the server", zap.Error(err))
+		os.Exit(1)
+	}
+
+	logger.Info("shutdown performed successfully")
 }
 
 type serverConf struct {
-	Address   string
-	Auth      *keycloak.OpenIDAuth
-	DB        *gocql.Session
-	RDB       *redis.Client
-	Zookeeper *zk.Conn
+	Address     string
+	Auth        *keycloak.OpenIDAuth
+	Cassandra   *gocql.Session
+	Redis       *redis.Client
+	Zookeeper   *zk.Conn
+	Middlewares []func(next http.Handler) http.Handler
 }
 
-func newServer(conf serverConf) (*http.Server, error) {
+func newServer(conf serverConf) *http.Server {
 	r := mux.NewRouter()
 
-	counter := zookeeper.NewCounter(conf.Zookeeper)
-	if err := counter.UpdateCounterBase(); err != nil {
-		return nil, err
+	for _, middleware := range conf.Middlewares {
+		r.Use(middleware)
 	}
 
+	counter := zookeeper.NewCounter(conf.Zookeeper)
+	_ = counter.UpdateCounterBase() // TODO: goroutine
+
 	encoder := base62.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
-	caching := redisAdapter.NewRedisCaching(conf.RDB)
-	repo := repository.NewLinkRepository(conf.DB)
+	caching := redisAdapter.NewRedisCaching(conf.Redis)
+	repo := repository.NewLinkRepository(conf.Cassandra)
 
-	svc := service.NewLinkService(counter, encoder, caching, repo)
+	service := service.NewLinkService(counter, encoder, caching, repo)
 
-	rest.NewLinkHandler(conf.Auth, svc).Register(r)
+	rest.NewLinkHandler(conf.Auth, service).Register(r)
 
 	return &http.Server{
 		Addr:              conf.Address,
@@ -69,81 +145,5 @@ func newServer(conf serverConf) (*http.Server, error) {
 		WriteTimeout:      10 * time.Second,
 		IdleTimeout:       5 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
-	}, nil
-}
-
-func run(addr string) (<-chan error, error) {
-	conf, err := config.Init()
-	if err != nil {
-		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "configuration initialization")
 	}
-
-	dbSession, err := cassandra.New(conf)
-	if err != nil {
-		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "new cassandra server connection")
-	}
-
-	rdbConn, err := redisAdapter.New(conf)
-	if err != nil {
-		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "new redis server connection")
-	}
-
-	zkConn, err := zookeeper.New(conf)
-	if err != nil {
-		return nil, util.WrapErrorf(err, util.ErrCodeUnknown, "new zookeeper server connection")
-	}
-
-	auth := keycloak.NewOpenIDAuth(conf)
-
-	srv, err := newServer(serverConf{
-		Address:   addr,
-		Auth:      auth,
-		DB:        dbSession,
-		RDB:       rdbConn,
-		Zookeeper: zkConn,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	c := make(chan error, 1)
-	ctx, stop := signal.NotifyContext(context.Background(),
-		os.Interrupt,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
-
-	go func() {
-		<-ctx.Done()
-
-		log.Println("shutdown signal received")
-
-		timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-		defer func() {
-			dbSession.Close()
-			rdbConn.Close()
-			zkConn.Close()
-			stop()
-			cancel()
-			close(c)
-		}()
-
-		srv.SetKeepAlivesEnabled(false)
-
-		if err := srv.Shutdown(timeout); err != nil {
-			c <- err
-		}
-
-		log.Println("successful shutdown")
-	}()
-
-	go func() {
-		log.Println("server started")
-
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			c <- err
-		}
-	}()
-
-	return c, nil
 }
