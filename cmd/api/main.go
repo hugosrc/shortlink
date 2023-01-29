@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/go-redis/redis/v9"
 	"github.com/go-zookeeper/zk"
 	"github.com/gocql/gocql"
@@ -18,6 +19,7 @@ import (
 	"github.com/hugosrc/shortlink/config"
 	"github.com/hugosrc/shortlink/internal/adapter/cassandra"
 	"github.com/hugosrc/shortlink/internal/adapter/cassandra/repository"
+	kafkaAdapter "github.com/hugosrc/shortlink/internal/adapter/kafka"
 	"github.com/hugosrc/shortlink/internal/adapter/keycloak"
 	redisAdapter "github.com/hugosrc/shortlink/internal/adapter/redis"
 	"github.com/hugosrc/shortlink/internal/adapter/zookeeper"
@@ -42,23 +44,29 @@ func main() {
 
 	cassandraConn, err := cassandra.New(config)
 	if err != nil {
-		logger.Error("couldn't connect to cassandra: %s", zap.Error(err))
+		logger.Error("couldn't connect to cassandra", zap.Error(err))
 		os.Exit(1)
 	}
 
 	redisConn, err := redisAdapter.New(config)
 	if err != nil {
-		logger.Error("couldn't connect to redis: %s", zap.Error(err))
+		logger.Error("couldn't connect to redis", zap.Error(err))
 		os.Exit(1)
 	}
 
 	zookeeperConn, err := zookeeper.New(config)
 	if err != nil {
-		logger.Error("couldn't connect to zookeeper: %s", zap.Error(err))
+		logger.Error("couldn't connect to zookeeper", zap.Error(err))
 		os.Exit(1)
 	}
 
 	keycloakAuth := keycloak.NewOpenIDAuth(config)
+
+	kafkaProducer, err := kafkaAdapter.NewProducer(config)
+	if err != nil {
+		logger.Error("couldn't connect to kafka", zap.Error(err))
+		os.Exit(1)
+	}
 
 	logMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,12 +76,14 @@ func main() {
 	}
 
 	server := newServer(serverConf{
-		Address:     fmt.Sprintf(":%d", 3000),
-		Auth:        keycloakAuth,
-		Cassandra:   cassandraConn,
-		Redis:       redisConn,
-		Zookeeper:   zookeeperConn,
-		Middlewares: []func(next http.Handler) http.Handler{logMiddleware},
+		Address:      fmt.Sprintf(":%d", 3000),
+		Auth:         keycloakAuth,
+		Cassandra:    cassandraConn,
+		Redis:        redisConn,
+		Zookeeper:    zookeeperConn,
+		Kafka:        kafkaProducer,
+		MetricsTopic: config.GetString("KAFKA_METRICS_PRODUCER_TOPIC_NAME"),
+		Middlewares:  []func(next http.Handler) http.Handler{logMiddleware},
 	})
 
 	go func() {
@@ -99,6 +109,7 @@ func main() {
 
 		cassandraConn.Close()
 		zookeeperConn.Close()
+		kafkaProducer.Close()
 		cancel()
 		close(done)
 	}()
@@ -112,12 +123,14 @@ func main() {
 }
 
 type serverConf struct {
-	Address     string
-	Auth        *keycloak.OpenIDAuth
-	Cassandra   *gocql.Session
-	Redis       *redis.Client
-	Zookeeper   *zk.Conn
-	Middlewares []func(next http.Handler) http.Handler
+	Address      string
+	Auth         *keycloak.OpenIDAuth
+	Cassandra    *gocql.Session
+	Redis        *redis.Client
+	Zookeeper    *zk.Conn
+	Kafka        *kafka.Producer
+	MetricsTopic string
+	Middlewares  []func(next http.Handler) http.Handler
 }
 
 func newServer(conf serverConf) *http.Server {
@@ -136,7 +149,9 @@ func newServer(conf serverConf) *http.Server {
 
 	service := service.NewLinkService(counter, encoder, caching, repo)
 
-	rest.NewLinkHandler(conf.Auth, service).Register(r)
+	metricsProducer := kafkaAdapter.NewKafkaMetricsProducer(conf.MetricsTopic, conf.Kafka)
+
+	rest.NewLinkHandler(conf.Auth, metricsProducer, service).Register(r)
 
 	return &http.Server{
 		Addr:              conf.Address,

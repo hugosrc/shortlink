@@ -3,11 +3,13 @@ module github.com/hugosrc/shortlink
 go 1.17
 
 require (
+	github.com/confluentinc/confluent-kafka-go v1.9.2
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/go-zookeeper/zk v1.0.2
 	github.com/gocql/gocql v1.0.0
 	github.com/gorilla/mux v1.8.0
 	github.com/jxskiss/base62 v1.1.0
+	github.com/mileusna/useragent v1.2.1
 	github.com/spf13/viper v1.11.0
 	go.uber.org/zap v1.24.0
 )

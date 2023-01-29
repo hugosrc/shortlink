@@ -194,6 +194,24 @@ docker compose up -d redis
 docker compose up -d zookeeper
 ```
 
+### Kafka
+
+To create kafka, it is recommended to start a cluster on [Confluent Cloud](https://confluent.cloud/), using the free service available.
+
+1. go to the [Confluent Cloud](https://confluent.cloud/) website
+
+2. perform signin/signup
+
+3. create a default kafka cluster
+
+4. create kakfa cluster API key
+
+5. set the received values to the following environment variables.`KAFKA_BOOTSTRAP_SERVERS, KAFKA_SASL_USERNAME, KAFKA_SASL_PASSWORD`
+
+6. create a new topic and set it to the environment variable `KAFKA_METRICS_PRODUCER_TOPIC_NAME`
+
+Well, now let's proceed.
+
 #### Start Server
 
 All done, now just start the server 
