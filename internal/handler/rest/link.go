@@ -2,22 +2,28 @@ package rest
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/hugosrc/shortlink/internal/core/domain"
 	"github.com/hugosrc/shortlink/internal/core/port"
 	"github.com/hugosrc/shortlink/internal/util"
+	"github.com/mileusna/useragent"
 )
 
 type LinkHandler struct {
-	auth port.Auth
-	svc  port.LinkService
+	auth     port.Auth
+	producer port.MetricsProducer
+	svc      port.LinkService
 }
 
-func NewLinkHandler(auth port.Auth, svc port.LinkService) *LinkHandler {
+func NewLinkHandler(auth port.Auth, producer port.MetricsProducer, svc port.LinkService) *LinkHandler {
 	return &LinkHandler{
-		auth: auth,
-		svc:  svc,
+		auth:     auth,
+		producer: producer,
+		svc:      svc,
 	}
 }
 
@@ -29,13 +35,33 @@ func (h *LinkHandler) Register(r *mux.Router) {
 }
 
 func (h *LinkHandler) show(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+	hash := mux.Vars(r)["hash"]
 
-	url, err := h.svc.FindByHash(r.Context(), vars["hash"])
+	url, err := h.svc.FindByHash(r.Context(), hash)
 	if err != nil {
 		handleError(w, err, "An internal error has occurred. Please try again later.")
 		return
 	}
+
+	go func() {
+		userIP, _, _ := net.SplitHostPort(r.RemoteAddr)
+		userAgent := useragent.Parse(r.Header.Get("User-Agent"))
+
+		_ = h.producer.Produce(&domain.LinkMetrics{
+			ShortURL:       hash,
+			OriginalURL:    url,
+			IPAddress:      userIP,
+			Referer:        r.Referer(),
+			Device:         userAgent.Device,
+			OS:             userAgent.OS,
+			OSVersion:      userAgent.OSVersion,
+			UserAgent:      userAgent.String,
+			UserAgentName:  userAgent.Name,
+			Version:        userAgent.Version,
+			AcceptLanguage: r.Header.Get("Accept-Language"),
+			AccessTime:     time.Now(),
+		})
+	}()
 
 	http.Redirect(w, r, url, http.StatusFound)
 }
