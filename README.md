@@ -21,6 +21,7 @@ Highly available and scalable URL shortening service.
     - [Cassandra](#cassandra)
     - [Redis](#redis)
     - [Zookeeper](#zookeeper)
+    - [Kafka](#kafka)
     - [Start Server](#start-server)
 - [Contact](#contact)
 
@@ -53,6 +54,7 @@ Shortlink is a highly scalable and available service that allows users to shorte
 - [Redis](https://redis.io/)
 - [Zookeeper](https://zookeeper.apache.org/)
 - [Keycloak](https://www.keycloak.org/)
+- [Kafka](https://kafka.apache.org/)
 - [Docker](https://www.docker.com/)
 - [Kubernetes](https://kubernetes.io/)
 - [GitHub Actions](https://github.com/features/actions)
@@ -194,7 +196,7 @@ docker compose up -d redis
 docker compose up -d zookeeper
 ```
 
-### Kafka
+#### Kafka
 
 To create kafka, it is recommended to start a cluster on [Confluent Cloud](https://confluent.cloud/), using the free service available.
 
