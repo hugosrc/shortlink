@@ -2,6 +2,8 @@
 
 Highly available and scalable URL shortening service.
 
+[![My Skills](https://skillicons.dev/icons?i=golang,cassandra,redis,kafka,docker,kubernetes,githubactions&theme=dark)](https://skillicons.dev)
+
 ## Table of contents
 
 - [Overview](#overview)
